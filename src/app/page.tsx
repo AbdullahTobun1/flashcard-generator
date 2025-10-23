@@ -5,48 +5,6 @@ import ReactCardFlip from "react-card-flip";
 import jsPDF from "jspdf";
 
 export default function Home() {
-  // 👇 ADD unlock state
-  const [unlocked, setUnlocked] = useState<boolean | null>(null);
-
-  // 👇 ADD: check if user is unlocked
-  useEffect(() => {
-    fetch("/api/session")
-      .then((r) => r.json())
-      .then((data) => setUnlocked(data.unlocked))
-      .catch(() => setUnlocked(false));
-  }, []);
-
-  // 👇 SHOW LOADING WHILE CHECKING
-  if (unlocked === null) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-yellow-50">
-        <p className="text-lg text-gray-600">Verifying access...</p>
-      </main>
-    );
-  }
-
-  // 👇 SHOW LOCKED SCREEN IF NOT UNLOCKED
-  if (!unlocked) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-yellow-50 p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-lg">
-          <h1 className="text-2xl font-bold text-purple-700 mb-4">🔒 Access Required</h1>
-          <p className="text-gray-700 mb-6">
-            You need a private access link to use this tool. If you purchased this product,
-            please open your download PDF and click the unlock link inside.
-          </p>
-          <a
-            href="https://your-gumroad-product.gumroad.com  "
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block rounded-lg bg-purple-600 text-white px-4 py-2 font-semibold hover:bg-purple-700"
-          >
-            View on Gumroad
-          </a>
-        </div>
-      </main>
-    );
-  }
   const [topic, setTopic] = useState("");
   const [grade, setGrade] = useState("");
   const [numCards, setNumCards] = useState("");
