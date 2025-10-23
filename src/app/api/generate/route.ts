@@ -64,7 +64,7 @@ Example: [{"front": "What is 2 + 2?", "back": "4"}]`;
     }
 
     // Extract only the JSON array
-    const match = jsonStr.match(/\[.*\]/s);
+    const match = jsonStr.match(/\[[\s\S]*\]/);
     if (match) jsonStr = match[0];
 
     let flashcards;
