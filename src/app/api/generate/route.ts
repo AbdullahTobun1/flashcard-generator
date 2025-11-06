@@ -15,11 +15,12 @@ export async function POST(req: Request) {
 Each flashcard must have:
 - "front": a clear question or term
 - "back": a concise, accurate answer
-Respond ONLY with a valid JSON array (no markdown, no text).`;
+Respond ONLY with a valid JSON array (no markdown, no text).
+Example: [{"front": "What is 2 + 2?", "back": "4"}]`;
 
-    // ✅ FIXED: use header for API key instead of URL param
+    // ✅ FIXED: valid payload structure per Google Gemini API
     const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
       {
         method: "POST",
         headers: {
@@ -27,33 +28,40 @@ Respond ONLY with a valid JSON array (no markdown, no text).`;
           "x-goog-api-key": process.env.GEMINI_API_KEY!,
         },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: prompt }],
+            },
+          ],
           generationConfig: {
-            maxOutputTokens: 2048,
             temperature: 0.5,
-            responseMimeType: "application/json",
+            maxOutputTokens: 2048,
           },
         }),
       }
     );
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Gemini API Error:", errorText);
+      const errText = await response.text();
+      console.error("Gemini API Error:", errText);
       return NextResponse.json(
-        { error: "Gemini API error", details: errorText },
+        { error: "Gemini API error", details: errText },
         { status: response.status }
       );
     }
 
     const data = await response.json();
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
-    if (!content) {
-      return NextResponse.json({ error: "Empty response from Gemini" }, { status: 500 });
+    if (!text) {
+      return NextResponse.json(
+        { error: "Empty response from Gemini" },
+        { status: 500 }
+      );
     }
 
-    let jsonStr = content;
+    let jsonStr = text;
     if (jsonStr.startsWith("```")) {
       jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
     }
@@ -64,13 +72,12 @@ Respond ONLY with a valid JSON array (no markdown, no text).`;
     let flashcards;
     try {
       flashcards = JSON.parse(jsonStr);
-      if (!Array.isArray(flashcards)) throw new Error("Invalid array");
-
+      if (!Array.isArray(flashcards)) throw new Error("Not an array");
       flashcards = flashcards
         .filter((f: any) => typeof f.front === "string" && typeof f.back === "string")
         .slice(0, numCards);
-    } catch (err) {
-      console.error("Parsing error:", err, jsonStr);
+    } catch (e) {
+      console.error("Parsing error:", e, jsonStr);
       flashcards = Array.from({ length: numCards }, (_, i) => ({
         front: `${topic} Question ${i + 1}`,
         back: `Answer for ${topic} Question ${i + 1}`,
