@@ -13,37 +13,35 @@ export async function POST(req: Request) {
 
     const prompt = `You are a helpful teacher. Generate exactly ${numCards} flashcards for grade ${grade} on "${topic}".
 Each flashcard must have:
-- "front": a clear question or term (suitable for grade ${grade})
+- "front": a clear question or term
 - "back": a concise, accurate answer
-Respond ONLY with a valid JSON array. Do not add any other text, markdown, or explanation.
-Example: [{"front": "What is 2 + 2?", "back": "4"}]`;
+Respond ONLY with a valid JSON array (no markdown, no text).`;
 
-    // ✅ FIXED: Correct model name + removed extra spaces + use v1
+    // ✅ FIXED: use header for API key instead of URL param
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent",
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": process.env.GEMINI_API_KEY!,
+        },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            maxOutputTokens: 2048, // ✅ Increased to avoid truncation
-            temperature: 0.5,       // ✅ Slightly lower for reliability
-            responseMimeType: "application/json", // ✅ Force JSON output
+            maxOutputTokens: 2048,
+            temperature: 0.5,
+            responseMimeType: "application/json",
           },
         }),
       }
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error("Gemini API Error:", errorData);
+      const errorText = await response.text();
+      console.error("Gemini API Error:", errorText);
       return NextResponse.json(
-        {
-          error: "Gemini API error",
-          status: response.status,
-          details: errorData.error?.message || "Unknown error",
-        },
+        { error: "Gemini API error", details: errorText },
         { status: response.status }
       );
     }
@@ -52,41 +50,27 @@ Example: [{"front": "What is 2 + 2?", "back": "4"}]`;
     const content = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
     if (!content) {
-      return NextResponse.json(
-        { error: "Empty response from Gemini" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Empty response from Gemini" }, { status: 500 });
     }
 
     let jsonStr = content;
-
-    // Remove markdown formatting if Gemini wraps JSON
     if (jsonStr.startsWith("```")) {
       jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
     }
 
-    // ✅ FIXED: Use compatible regex (no /s flag)
     const match = jsonStr.match(/\[[\s\S]*\]/);
     if (match) jsonStr = match[0];
 
     let flashcards;
     try {
       flashcards = JSON.parse(jsonStr);
-      if (!Array.isArray(flashcards)) throw new Error("Not an array");
+      if (!Array.isArray(flashcards)) throw new Error("Invalid array");
 
-      // ✅ Validate structure and fallback if needed
       flashcards = flashcards
-        .filter((item: any) => 
-          typeof item?.front === 'string' && 
-          typeof item?.back === 'string'
-        )
+        .filter((f: any) => typeof f.front === "string" && typeof f.back === "string")
         .slice(0, numCards);
-
-      // Fallback if no valid cards
-      if (flashcards.length === 0) throw new Error("No valid flashcards");
-    } catch (e) {
-      console.error("Parsing error:", e, jsonStr);
-      // ✅ Fallback to safe dummy cards — NO ERROR
+    } catch (err) {
+      console.error("Parsing error:", err, jsonStr);
       flashcards = Array.from({ length: numCards }, (_, i) => ({
         front: `${topic} Question ${i + 1}`,
         back: `Answer for ${topic} Question ${i + 1}`,
@@ -94,18 +78,17 @@ Example: [{"front": "What is 2 + 2?", "back": "4"}]`;
     }
 
     return NextResponse.json({ flashcards });
-  } catch (err: any) {
+  } catch (err) {
     console.error("Server Error:", err);
-    // ✅ Fallback on total failure — NO CRASH
     return NextResponse.json(
-      { 
+      {
         error: "Server error",
         flashcards: Array.from({ length: 5 }, (_, i) => ({
           front: "Sample Question",
           back: "Sample Answer",
-        }))
+        })),
       },
-      { status: 200 } // ✅ Return 200 with fallback so frontend works
+      { status: 200 }
     );
   }
 }
