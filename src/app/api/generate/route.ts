@@ -1,3 +1,4 @@
+// src/app/api/generate/route.ts
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
@@ -18,19 +19,30 @@ Each flashcard must have:
 Respond ONLY with a valid JSON array (no markdown, no text).
 Example: [{"front": "What is 2 + 2?", "back": "4"}]`;
 
-    // ✅ FIXED: valid payload structure per Google Gemini API
+    // ✅ CORRECT URL — no spaces, proper endpoint
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
+          contents: [
+            {
+              parts: [{ text: prompt }], // 'role' is optional; 'parts' is required
+            },
+          ],
           generationConfig: {
-            maxOutputTokens: 2048,
             temperature: 0.5,
-            response_mime_type: "application/json", // ✅ CORRECT FOR v1
+            maxOutputTokens: 2048,
           },
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+          ],
         }),
       }
     );
@@ -54,11 +66,11 @@ Example: [{"front": "What is 2 + 2?", "back": "4"}]`;
       );
     }
 
+    // ✅ Clean and parse JSON safely (your original logic)
     let jsonStr = text;
     if (jsonStr.startsWith("```")) {
       jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
     }
-
     const match = jsonStr.match(/\[[\s\S]*\]/);
     if (match) jsonStr = match[0];
 
@@ -71,15 +83,17 @@ Example: [{"front": "What is 2 + 2?", "back": "4"}]`;
         .slice(0, numCards);
     } catch (e) {
       console.error("Parsing error:", e, jsonStr);
+      // Fallback to mock cards (this was in your working version!)
       flashcards = Array.from({ length: numCards }, (_, i) => ({
-        front: `${topic} Question ${i + 1}`,
-        back: `Answer for ${topic} Question ${i + 1}`,
+        front: `${topic} Flashcard #${i + 1}`,
+        back: `Answer for ${topic} Flashcard #${i + 1}`,
       }));
     }
 
     return NextResponse.json({ flashcards });
   } catch (err) {
     console.error("Server Error:", err);
+    // Fallback on full error (also from your working version)
     return NextResponse.json(
       {
         error: "Server error",
