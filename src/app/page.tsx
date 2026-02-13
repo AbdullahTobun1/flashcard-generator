@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import ReactCardFlip from "react-card-flip";
 import jsPDF from "jspdf";
 
@@ -13,23 +13,12 @@ export default function Home() {
   const [flipped, setFlipped] = useState<boolean[]>([]);
   const [cardsPerPage, setCardsPerPage] = useState<number>(8);
 
-  // safer JSON parse helper (returns { ok, data, raw, error })
-  const safeParseJSON = async (res: Response) => {
-    const text = await res.text();
-    try {
-      const data = text ? JSON.parse(text) : null;
-      return { ok: true, data, raw: text };
-    } catch (e) {
-      return {
-        ok: false,
-        error: `Invalid JSON from server (first 500 chars): ${text.slice(0, 500)}`,
-        raw: text,
-      };
+  const handleGenerate = async () => {
+    if (!topic || !grade || !numCards) {
+      alert("Please fill in all fields.");
+      return;
     }
-  };
 
-  const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault();
     setLoading(true);
     setFlashcards([]);
     setFlipped([]);
@@ -38,44 +27,29 @@ export default function Home() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // convert numCards to number if possible
-        body: JSON.stringify({ topic, grade, numCards: Number(numCards) }),
+        body: JSON.stringify({
+          topic,
+          grade,
+          numCards: Number(numCards),
+        }),
       });
 
-      const parsed = await safeParseJSON(res);
+      const data = await res.json();
 
       if (!res.ok) {
-        // If JSON parsed and contains error, show it; otherwise show raw or status
-        const serverError =
-          (parsed.ok && parsed.data && (parsed.data as any).error) ||
-          parsed.error ||
-          `${res.status} ${res.statusText}`;
-        alert("Server error: " + serverError);
-        setLoading(false);
+        alert(data?.error || "Server error");
         return;
       }
 
-      if (!parsed.ok) {
-        // 2xx but invalid JSON
-        alert(parsed.error || "Server returned unexpected non-JSON response.");
-        setLoading(false);
-        return;
-      }
-
-      const data = parsed.data;
-      if (!data || !Array.isArray(data.flashcards)) {
-        alert(
-          "Unexpected response shape. Expected `{ flashcards: [...] }`. Raw server response (first 500 chars):\n\n" +
-            (parsed.raw || "").slice(0, 500)
-        );
-        setLoading(false);
+      if (!Array.isArray(data.flashcards)) {
+        alert("Invalid response from server.");
         return;
       }
 
       setFlashcards(data.flashcards);
       setFlipped(new Array(data.flashcards.length).fill(false));
     } catch (err: any) {
-      alert("Request failed: " + (err?.message || String(err)));
+      alert("Request failed: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -89,7 +63,6 @@ export default function Home() {
     });
   };
 
-  // grid layouts allowed
   const gridLayouts: Record<number, { rows: number; cols: number }> = {
     4: { rows: 2, cols: 2 },
     6: { rows: 2, cols: 3 },
@@ -97,9 +70,8 @@ export default function Home() {
     12: { rows: 3, cols: 4 },
   };
 
-  // ensure we always have a valid layout (fallback to 8)
   const layout = gridLayouts[cardsPerPage] ?? gridLayouts[8];
-  const { cols } = layout;
+  const { rows, cols } = layout;
 
   const downloadPDF = () => {
     if (!flashcards.length) {
@@ -107,18 +79,26 @@ export default function Home() {
       return;
     }
 
-    const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+    const pdf = new jsPDF({
+      orientation: "landscape",
+      unit: "pt",
+      format: "a4",
+    });
+
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
 
     const margin = 40;
     const gap = 10;
 
-    const rows = layout.rows;
-    const cardWidth = (pageWidth - margin * 2 - gap * (cols - 1)) / cols;
-    const cardHeight = (pageHeight - margin * 2 - gap * (rows - 1)) / rows;
+    const cardWidth =
+      (pageWidth - margin * 2 - gap * (cols - 1)) / cols;
+    const cardHeight =
+      (pageHeight - margin * 2 - gap * (rows - 1)) / rows;
 
-    const pagesCount = Math.ceil(flashcards.length / cardsPerPage);
+    const pagesCount = Math.ceil(
+      flashcards.length / cardsPerPage
+    );
 
     for (let pageIndex = 0; pageIndex < pagesCount; pageIndex++) {
       const pageCards = flashcards.slice(
@@ -126,46 +106,38 @@ export default function Home() {
         (pageIndex + 1) * cardsPerPage
       );
 
-      // --- Draw FRONTs in normal order ---
+      // FRONT
       pageCards.forEach((card, i) => {
         const row = Math.floor(i / cols);
         const col = i % cols;
         const x = margin + col * (cardWidth + gap);
         const y = margin + row * (cardHeight + gap);
 
-        pdf.setDrawColor(0);
         pdf.rect(x, y, cardWidth, cardHeight);
-
-        pdf.setFontSize(Math.min(18, cardWidth / 6));
-        // center text
         pdf.text(card.front || "", x + cardWidth / 2, y + cardHeight / 2, {
           maxWidth: cardWidth - 20,
           align: "center",
         });
       });
 
-      // add page for backs
       pdf.addPage();
 
-      // --- Draw BACKs in horizontally reversed order so they line up when printed double-sided ---
+      // BACK (mirrored)
       pageCards.forEach((card, i) => {
         const row = Math.floor(i / cols);
         const col = i % cols;
-        const reversedCol = cols - 1 - col; // mirror horizontally
+        const reversedCol = cols - 1 - col;
+
         const x = margin + reversedCol * (cardWidth + gap);
         const y = margin + row * (cardHeight + gap);
 
-        pdf.setDrawColor(0);
         pdf.rect(x, y, cardWidth, cardHeight);
-
-        pdf.setFontSize(Math.min(18, cardWidth / 6));
         pdf.text(card.back || "", x + cardWidth / 2, y + cardHeight / 2, {
           maxWidth: cardWidth - 20,
           align: "center",
         });
       });
 
-      // If not last page, add a fresh page for the next front page
       if (pageIndex < pagesCount - 1) {
         pdf.addPage();
       }
@@ -177,28 +149,33 @@ export default function Home() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-yellow-50 p-4">
       <div className="w-full max-w-5xl rounded-2xl bg-white p-6 shadow-lg">
-        <h1 className="mb-4 text-2xl font-bold text-purple-700">Flashcard Generator 🚀</h1>
+        <h1 className="mb-4 text-2xl font-bold text-purple-700">
+          Flashcard Generator 🚀
+        </h1>
 
-        <form onSubmit={handleGenerate} className="space-y-4">
+        {/* NO FORM — prevents accidental GET */}
+        <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-900">Topic</label>
+            <label className="block text-sm font-medium">
+              Topic
+            </label>
             <input
               type="text"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               className="mt-1 w-full rounded-md border p-2 text-black"
-              placeholder="e.g. Fruits, Multiplication"
-              required
+              placeholder="e.g. Multiplication"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900">Grade</label>
+            <label className="block text-sm font-medium">
+              Grade
+            </label>
             <select
               value={grade}
               onChange={(e) => setGrade(e.target.value)}
               className="mt-1 w-full rounded-md border p-2 text-black"
-              required
             >
               <option value="">Select grade</option>
               {[1, 2, 3, 4, 5, 6].map((g) => (
@@ -210,7 +187,9 @@ export default function Home() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900">Number of Flashcards</label>
+            <label className="block text-sm font-medium">
+              Number of Flashcards
+            </label>
             <input
               type="number"
               value={numCards}
@@ -218,16 +197,18 @@ export default function Home() {
               className="mt-1 w-full rounded-md border p-2 text-black"
               min={1}
               max={50}
-              placeholder="e.g. 10"
-              required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900">Cards per Page</label>
+            <label className="block text-sm font-medium">
+              Cards per Page
+            </label>
             <select
               value={cardsPerPage}
-              onChange={(e) => setCardsPerPage(parseInt(e.target.value))}
+              onChange={(e) =>
+                setCardsPerPage(parseInt(e.target.value))
+              }
               className="mt-1 w-full rounded-md border p-2 text-black"
             >
               {[4, 6, 8, 12].map((n) => (
@@ -239,21 +220,26 @@ export default function Home() {
           </div>
 
           <button
-            type="submit"
+            type="button"
+            onClick={handleGenerate}
             disabled={loading}
             className="w-full rounded-lg bg-purple-600 py-2 font-semibold text-white hover:bg-purple-700"
           >
             {loading ? "Generating..." : "Generate"}
           </button>
-        </form>
+        </div>
 
         {flashcards.length > 0 && (
           <div className="mt-8">
-            <h2 className="mb-4 text-lg font-bold text-gray-800">Flashcards Preview</h2>
+            <h2 className="mb-4 text-lg font-bold">
+              Flashcards Preview
+            </h2>
 
             <div
-              className={`grid gap-4`}
-              style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+              className="grid gap-4"
+              style={{
+                gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+              }}
             >
               {flashcards.map((card, i) => (
                 <div
@@ -261,11 +247,14 @@ export default function Home() {
                   className="h-40 cursor-pointer"
                   onClick={() => handleFlip(i)}
                 >
-                  <ReactCardFlip isFlipped={Boolean(flipped[i])} flipDirection="horizontal">
-                    <div className="h-full rounded-xl shadow-lg flex items-center justify-center text-center p-4 bg-yellow-100 text-gray-800 font-semibold">
+                  <ReactCardFlip
+                    isFlipped={Boolean(flipped[i])}
+                    flipDirection="horizontal"
+                  >
+                    <div className="h-full rounded-xl shadow-lg flex items-center justify-center text-center p-4 bg-yellow-100 font-semibold">
                       {card.front}
                     </div>
-                    <div className="h-full rounded-xl shadow-lg flex items-center justify-center text-center p-4 bg-blue-100 text-gray-800 font-semibold">
+                    <div className="h-full rounded-xl shadow-lg flex items-center justify-center text-center p-4 bg-blue-100 font-semibold">
                       {card.back}
                     </div>
                   </ReactCardFlip>
@@ -273,7 +262,7 @@ export default function Home() {
               ))}
             </div>
 
-            <div className="col-span-full text-center mt-6">
+            <div className="mt-6 text-center">
               <button
                 onClick={downloadPDF}
                 className="rounded-lg bg-purple-600 px-4 py-2 font-semibold text-white hover:bg-purple-700"
