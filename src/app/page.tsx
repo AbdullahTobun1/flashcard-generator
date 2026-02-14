@@ -91,14 +91,10 @@ export default function Home() {
     const margin = 40;
     const gap = 10;
 
-    const cardWidth =
-      (pageWidth - margin * 2 - gap * (cols - 1)) / cols;
-    const cardHeight =
-      (pageHeight - margin * 2 - gap * (rows - 1)) / rows;
+    const cardWidth = (pageWidth - margin * 2 - gap * (cols - 1)) / cols;
+    const cardHeight = (pageHeight - margin * 2 - gap * (rows - 1)) / rows;
 
-    const pagesCount = Math.ceil(
-      flashcards.length / cardsPerPage
-    );
+    const pagesCount = Math.ceil(flashcards.length / cardsPerPage);
 
     for (let pageIndex = 0; pageIndex < pagesCount; pageIndex++) {
       const pageCards = flashcards.slice(
@@ -147,18 +143,15 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-yellow-50 p-4">
-      <div className="w-full max-w-5xl rounded-2xl bg-white p-6 shadow-lg">
+    <main className="flex min-h-screen items-center justify-center bg-yellow-50 p-4 text-black">
+      <div className="w-full max-w-5xl rounded-2xl bg-white p-6 shadow-lg text-black">
         <h1 className="mb-4 text-2xl font-bold text-purple-700">
           Flashcard Generator 🚀
         </h1>
 
-        {/* NO FORM — prevents accidental GET */}
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium">
-              Topic
-            </label>
+            <label className="block text-sm font-medium text-black">Topic</label>
             <input
               type="text"
               value={topic}
@@ -169,9 +162,7 @@ export default function Home() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium">
-              Grade
-            </label>
+            <label className="block text-sm font-medium text-black">Grade</label>
             <select
               value={grade}
               onChange={(e) => setGrade(e.target.value)}
@@ -187,7 +178,7 @@ export default function Home() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium">
+            <label className="block text-sm font-medium text-black">
               Number of Flashcards
             </label>
             <input
@@ -201,14 +192,12 @@ export default function Home() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium">
+            <label className="block text-sm font-medium text-black">
               Cards per Page
             </label>
             <select
               value={cardsPerPage}
-              onChange={(e) =>
-                setCardsPerPage(parseInt(e.target.value))
-              }
+              onChange={(e) => setCardsPerPage(parseInt(e.target.value))}
               className="mt-1 w-full rounded-md border p-2 text-black"
             >
               {[4, 6, 8, 12].map((n) => (
@@ -231,30 +220,21 @@ export default function Home() {
 
         {flashcards.length > 0 && (
           <div className="mt-8">
-            <h2 className="mb-4 text-lg font-bold">
+            <h2 className="mb-4 text-lg font-bold text-black">
               Flashcards Preview
             </h2>
 
             <div
               className="grid gap-4"
-              style={{
-                gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-              }}
+              style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
             >
               {flashcards.map((card, i) => (
-                <div
-                  key={i}
-                  className="h-40 cursor-pointer"
-                  onClick={() => handleFlip(i)}
-                >
-                  <ReactCardFlip
-                    isFlipped={Boolean(flipped[i])}
-                    flipDirection="horizontal"
-                  >
-                    <div className="h-full rounded-xl shadow-lg flex items-center justify-center text-center p-4 bg-yellow-100 font-semibold">
+                <div key={i} className="h-40 cursor-pointer" onClick={() => handleFlip(i)}>
+                  <ReactCardFlip isFlipped={Boolean(flipped[i])} flipDirection="horizontal">
+                    <div className="h-full rounded-xl shadow-lg flex items-center justify-center text-center p-4 bg-yellow-100 font-semibold text-black">
                       {card.front}
                     </div>
-                    <div className="h-full rounded-xl shadow-lg flex items-center justify-center text-center p-4 bg-blue-100 font-semibold">
+                    <div className="h-full rounded-xl shadow-lg flex items-center justify-center text-center p-4 bg-blue-100 font-semibold text-black">
                       {card.back}
                     </div>
                   </ReactCardFlip>
